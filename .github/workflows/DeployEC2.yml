@@ -38,6 +38,7 @@ jobs:
           EOF
 
   sync-to-gitlab:
+    needs: deploy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
