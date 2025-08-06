@@ -1,0 +1,38 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" > ec2_key.pem
+          chmod 600 ec2_key.pem
+
+      - name: Build Docker image
+        run: docker build -t spring-api .
+
+      - name: Save Docker image
+        run: docker save spring-api -o spring-api.tar
+
+      - name: Copy image to EC2
+        run: scp -i ec2_key.pem -o StrictHostKeyChecking=no spring-api.tar ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:${{ secrets.EC2_APP_DIR }}
+
+      - name: Load and run image on EC2
+        run: |
+          ssh -i ec2_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            cd ${{ secrets.EC2_APP_DIR }}
+            docker load -i spring-api.tar
+            docker stop spring-api || true
+            docker rm spring-api || true
+            docker run -d --name spring-api -p 80:8080 spring-api
+          EOF
